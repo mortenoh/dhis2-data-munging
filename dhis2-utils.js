@@ -23,7 +23,7 @@ const seededRandom = (m_w = 123456789) => {
   }
 };
 
-const generateCode = (limit = 11, fn) => {
+const generateCode = (limit = 11, fn = Math.random) => {
   const allowedLetters = ["abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"].join( '' );
   const allowedChars = ['0123456789', allowedLetters].join( '' );
 
