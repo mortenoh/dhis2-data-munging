@@ -7,6 +7,7 @@ const csvParse = require( 'csv-parse/lib/sync' );
 const dhis2 = require( './dhis2' );
 const config = require( './config.json' );
 
+// load org units from filesystem
 const getOrgUnits = () => ljf.sync( path.resolve( __dirname, 'data/ous.json' ) ).organisationUnits;
 
 const getOrgUnitLevels = () => {
@@ -23,7 +24,7 @@ const createOrgUnits = async (d2) => {
   metadata.organisationUnits = getOrgUnits();
   metadata.organisationUnitLevels = getOrgUnitLevels();
 
-  // post metadata
+  // post metadata with orgUnits/orgUnitLevels
   try {
     const result = JSON.parse( (await d2.post( 'api/metadata', metadata )).text );
 
@@ -37,18 +38,18 @@ const createOrgUnits = async (d2) => {
   }
 };
 
+// update current user to have global as root org unit
 const updateCurrentUserRootOrgUnit = async (d2) => {
-  // update current user to have global as root org unit
+  let rootOrgUnit = (await d2.get( 'api/organisationUnits', {filter: 'level:eq:1'} )).body.organisationUnits[0];
+  let me = await d2.me();
+
+  me.organisationUnits = [{id: rootOrgUnit.id}];
+
+  const metadata = {
+    users: [me]
+  };
+
   try {
-    let rootOrgUnit = (await d2.get( 'api/organisationUnits', {filter: 'level:eq:1'} )).body.organisationUnits[0];
-    let me = await d2.me();
-
-    me.organisationUnits = [{id: rootOrgUnit.id}];
-
-    const metadata = {
-      users: [me]
-    };
-
     const result = JSON.parse( (await d2.post( 'api/metadata', metadata )).text );
 
     if ( result.status !== "OK" ) {
@@ -72,6 +73,7 @@ const createDataElements = async (d2) => {
   const data = await request.get( 'https://extranet.who.int/tme/generateCSV.asp' )
     .query( {ds: 'dictionary'} );
 
+  // seed random generator with a stable seed
   const randomFn = seededRandom( 123123 );
 
   const csv = csvParse( data.text, {delimiter: ',', columns: true} );
@@ -111,7 +113,7 @@ const createDataElements = async (d2) => {
     dataElementGroups: Object.values( deg )
   };
 
-  // post metadata
+  // post metadata with des/degs
   try {
     const result = JSON.parse( (await d2.post( 'api/metadata', metadata )).text );
 
@@ -126,16 +128,16 @@ const createDataElements = async (d2) => {
 };
 
 const createDataValues = async (d2) => {
-  const estimates = csvParse( (await request.get( 'https://extranet.who.int/tme/generateCSV.asp' )
-    .query( {ds: 'estimates'} )).text, {delimiter: ',', columns: true} );
-
-  let data = estimates.map( o => _.pick( o, ['iso3', 'year', 'e_pop_num', 'e_inc_100k'] ) );
-
   const ous = (await d2.get( 'api/organisationUnits', {fields: 'id,code', filter: 'level:eq:3'} )).body.organisationUnits;
   const ous_code = _.groupBy( ous, 'code' );
 
   const des = (await d2.get( 'api/dataElements', {fields: 'id,code'} )).body.dataElements;
   const des_code = _.groupBy( des, 'code' );
+
+  const estimates = csvParse( (await request.get( 'https://extranet.who.int/tme/generateCSV.asp' )
+    .query( {ds: 'estimates'} )).text, {delimiter: ',', columns: true} );
+
+  let data = estimates.map( o => _.pick( o, ['iso3', 'year', 'e_pop_num', 'e_inc_100k'] ) );
 
   // removed rows with invalid/missing orgunit
   data = data.filter( o => ous_code[o['iso3']] );

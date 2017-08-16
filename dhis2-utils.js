@@ -1,10 +1,11 @@
+const generateAuthorization = (username, password) => {
+  return "Basic " + new Buffer( username + ":" + password ).toString( "base64" );
+};
+
+// return a random value from given array
 const sample = (d = [], fn = Math.random) => {
   if ( d.length === 0 ) return;
   return d[Math.round( fn() * (d.length - 1) )];
-};
-
-const generateAuthorization = (username, password) => {
-  return "Basic " + new Buffer( username + ":" + password ).toString( "base64" );
 };
 
 // https://stackoverflow.com/questions/521295/seeding-the-random-number-generator-in-javascript
